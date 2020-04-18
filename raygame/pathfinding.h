@@ -18,12 +18,14 @@ namespace pathfinding
 		Vector2 position;
 
 		float gScore = 0.0f;
+		float hScore = 0.0f;
+		float fScore = gScore + hScore;
 		Node* previous = nullptr;
 
 		std::vector<Edge> connections;
 	};
 
-	std::vector<Node*> ddijkstrasSearch(Node* startNode, Node* endNode)
+	std::vector<Node*> dijkstrasSearch(Node* startNode, Node* endNode)
 	{
 		//Validate the input
 		if (startNode == nullptr || endNode == nullptr) {
@@ -71,13 +73,17 @@ namespace pathfinding
 				if (std::find(closedList.begin(), closedList.end(), e.target) != closedList.end()) {
 					continue;
 				}
+				
 				//Temporarily calculate the target node's G Score
 				float gScore = currentNode->gScore + e.cost;
-
+				//Temporarily calculate the target node's H Score
+				float hScore = e.target->gScore - gScore;
+				//Temporarily calculate the target node's F Score
+				float fScore = hScore + gScore;
 
 				//If the target node is not in the openList,update it
 				if (std::find(openList.begin(), openList.end(), e.target) == openList.end()) {
-					//Update the target node's G Score from the temporary value
+				//Update the target node's G Score from the temporary value
 					e.target->gScore = gScore;
 					//Set the target node's previous to currentNode
 					e.target->previous = currentNode;
@@ -85,7 +91,7 @@ namespace pathfinding
 					auto insertionPos = openList.end();
 					for (auto i = openList.begin(); i != openList.end(); i++)
 					{
-						if (e.target->gScore < (*i)->gScore) {
+						if (e.target->fScore < (*i)->fScore) {
 							insertionPos = i;
 							break;
 						}
@@ -95,30 +101,34 @@ namespace pathfinding
 				}
 				//Otherwise the target node IS in the open list
 				else {
-					//Compare the old G score the the new one before updating
-					if (gScore < e.target->gScore)
+					//Compare the old F score the the new one before updating
+					if (gScore < e.target->fScore)
 					{
 						//Update the target node's G Score from the temporary value
 						e.target->gScore = gScore;
+						//Update the target node's H Score from the temporary value
+						e.target->hScore = hScore;
+						//Update the target node's F Score from the temporary value
+						e.target->fScore = fScore;
+
 						//Set the target node's previous to currentNode
 						e.target->previous = currentNode;
 					}
 				}
 			}
 		}
+			//Create path in reverse from endNode to startNode
+			std::vector<Node*> path;
+			Node* currentNode = endNode;
 
-		//Create path in reverse from endNode to startNode
-		std::vector<Node*> path;
-		Node* currentNode = endNode;
+			while (currentNode != nullptr) {
+				//Add the current node to the beginning of the path
+				path.insert(path.begin(), currentNode);
+				//Go to the previous node
+				currentNode = currentNode->previous;
+			}
 
-		while (currentNode != nullptr) {
-			//Add the current node to the beginning of the path
-			path.insert(path.begin(), currentNode);
-			//Go to the previous node
-			currentNode = currentNode->previous;
-		}
-
-		return path;
+			return path;
 	}
 
 	void drawNode(Node* node, Vector2 scale, bool selected = false)
@@ -150,8 +160,36 @@ namespace pathfinding
 		DrawText(buffer, textX, textY, fontSize, WHITE);
 	}
 
-	void drawGraph()
-	{
+	void drawGraph(Node* node, Vector2 scale, std::vector<Node*>* drawnList = new std::vector<Node*>())
+	{		
+		if (node == nullptr)
+		{
+			return;
+		}
+
+		drawNode(node, scale);
+		drawnList->push_back(node);
+
+		float x = node->position.x * scale.x + scale.x / 2;
+		float y = node->position.y * scale.y + scale.y / 2;
+
+		//For each Edge in this node's connections
+		for (Edge e : node->connections) {
+			//Get target position
+			float tx = e.target->position.x * scale.x + scale.x / 2;
+			float ty = e.target->position.y * scale.y + scale.y / 2;
+			//Draw the Edge
+			DrawLineEx({ x,y }, { tx,ty }, (scale.x + scale.y) * 0.01f, WHITE);
+			//Draw the cost
+			static char buffer[10];
+			sprintf_s(buffer, "%.0f", e.cost);
+			int fonstSize = (scale.x + scale.y) * 0.1f;
+			DrawText(buffer, (int)((x + tx) / 2), (int)((y + ty) / 2), fonstSize, WHITE);
+			//Draw target node
+			if (std::find(drawnList->begin(), drawnList->end(), e.target) == drawnList->end()) {
+				drawGraph(e.target, scale, drawnList);
+			}
+		}
 
 	}
 }
